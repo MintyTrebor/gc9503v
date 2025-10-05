@@ -69,6 +69,7 @@ DATA_PIN_SCHEMA = pins.internal_gpio_output_pin_schema
 MODELS = {
     "PANLEE": gc9503v_ns.class_("GC9503VPANLEE", GC9503V),
     "VIEWE": gc9503v_ns.class_("GC9503VVIEWE", GC9503V),
+    "GC9503VUEDX48480040E": gc9503v_ns.class_("GC9503VUEDX48480040E", GC9503V),
 }
 
 def data_pin_validate(value):
@@ -133,7 +134,7 @@ CONFIG_SCHEMA = cv.All(
                 cv.Required(CONF_HSYNC_PIN): pins.internal_gpio_output_pin_schema,
                 cv.Required(CONF_VSYNC_PIN): pins.internal_gpio_output_pin_schema,
                 cv.Required(CONF_ENABLE_PIN): pins.internal_gpio_output_pin_schema,
-                cv.Required(CONF_RESET_PIN): pins.internal_gpio_output_pin_schema,
+                cv.Optional(CONF_RESET_PIN): pins.internal_gpio_output_pin_schema,
                 cv.Optional(CONF_HSYNC_PULSE_WIDTH, default=10): cv.int_,
                 cv.Optional(CONF_HSYNC_BACK_PORCH, default=10): cv.int_,
                 cv.Optional(CONF_HSYNC_FRONT_PORCH, default=20): cv.int_,
@@ -187,8 +188,9 @@ async def to_code(config):
     enable = await cg.gpio_pin_expression(config[CONF_ENABLE_PIN])
     cg.add(var.set_enable_pin(enable))
 
-    reset = await cg.gpio_pin_expression(config[CONF_RESET_PIN])
-    cg.add(var.set_reset_pin(reset))
+    if CONF_RESET_PIN in config:
+        reset = await cg.gpio_pin_expression(config[CONF_RESET_PIN])
+        cg.add(var.set_reset_pin(reset))
     
     sclk = await cg.gpio_pin_expression(config[CONF_SCLK_PIN])
     cg.add(var.set_sclk_pin(sclk))

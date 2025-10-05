@@ -159,7 +159,7 @@ void GC9503V::draw_pixels_at(int x_start, int y_start, int w, int h, const uint8
 		}
 	}
 	if (err != ESP_OK)
-	ESP_LOGE(TAG, "lcd_lcd_panel_draw_bitmap failed: %s", esp_err_to_name(err));
+		ESP_LOGE(TAG, "lcd_lcd_panel_draw_bitmap failed: %s", esp_err_to_name(err));
 }
 
 int GC9503V::get_width() {

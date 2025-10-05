@@ -1,0 +1,292 @@
+substitutions:
+  name: "touchpanel"
+  friendly_name: "Touch Panel"
+  device_description: "Viewe - 3 inch 480*480 IPS LCD TFT Touchscreen Display"
+  project_name: "Viewe.UEDX48480040E-WB-A-SDK"
+  project_version: "1.0.0"
+
+esphome:
+  name: "${name}"
+  friendly_name: "${friendly_name}"
+  project:
+    name: "${project_name}"
+    version: "${project_version}"
+  min_version: 2024.11.0
+  name_add_mac_suffix: false
+
+external_components:
+  - source: ../components
+
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: y
+      CONFIG_ESP32S3_DATA_CACHE_64KB: y
+      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: y
+      CONFIG_SPIRAM_RODATA: y
+psram:
+  speed: 80MHz
+  mode: octal
+
+debug:
+  update_interval: 30s
+
+# Enable logging
+logger:
+  level: DEBUG
+  hardware_uart: UART0
+
+# Enable Home Assistant API
+api:
+
+# Allow Over-The-Air updates
+ota:
+- platform: esphome
+
+mdns:
+  disabled: false
+
+wifi:
+  power_save_mode: none
+  networks:
+    - ssid: !secret wifi_ssid
+      password: !secret wifi_password
+
+captive_portal:
+
+spi:    #required only for libraries
+
+display:
+  - platform: gc9503v
+    model: GC9503VUEDX48480040E
+    # show_test_card: true
+    # update_interval: never
+    auto_clear_enabled: false
+    id: my_display
+    color_order: RGB
+    dimensions:
+      width: 480
+      height: 480  
+    de_pin:
+      number: 18
+      inverted: false
+    hsync_pin:
+      number: 16
+      inverted: false
+    vsync_pin:
+      number: 17
+      inverted: false
+    pclk_pin: 21
+
+    pclk_inverted: false
+    pclk_frequency: 18MHz
+
+    hsync_pulse_width: 8
+    hsync_back_porch: 40
+    hsync_front_porch: 40
+    vsync_pulse_width: 2
+    vsync_back_porch: 4
+    vsync_front_porch: 16
+    data_pins:
+      red:
+        - 4         # R1
+        - 3         # R2
+        - 2         # R3
+        - 1          # R4
+        - 0          # R5
+      green:
+        - 10         # G0
+        - 9         # G1
+        - 8         # G2
+        - 7         # G3
+        - 6         # G4
+        - 5         # G5 
+      blue:
+        - 15         # B1
+        - 14         # B2
+        - 13         # B3
+        - 12         # B4
+        - 11         # B5
+
+    enable_pin:
+      number: 39
+      inverted: false
+    sclk_pin:
+      number: 48
+    mosi_pin:
+      number: 47
+
+i2c:
+  sda: 40
+  sda_pullup_enabled: true
+  scl: 41
+  scl_pullup_enabled: true
+  scan: true
+  frequency: 400kHz
+
+
+touchscreen:
+  - platform: ft5x06
+    id: my_touchscreen
+    address: 0x38
+    calibration:
+      x_min: 0
+      x_max: 480
+      y_min: 0
+      y_max: 480
+    on_touch:
+      - logger.log:
+          format: Touch at (%d, %d) [%d, %d]
+          args: [touch.x, touch.y, touch.x_raw, touch.y_raw]
+    on_release:
+      - light.turn_on:
+          id: backlight
+          brightness: 100%
+
+sensor:
+  - platform: uptime
+    name: "Uptime Sensor"
+    id: uptime_sensor
+    type:
+      timestamp
+    entity_category: "diagnostic"
+
+  - platform: wifi_signal # Reports the WiFi signal strength/RSSI in dB
+    name: "WiFi Signal dB"
+    id: wifi_signal_db
+    update_interval: 60s
+    entity_category: "diagnostic"
+
+  - platform: copy # Reports the WiFi signal strength in %
+    source_id: wifi_signal_db
+    name: "WiFi Signal Percent"
+    filters:
+      - lambda: return min(max(2 * (x + 100.0), 0.0), 100.0);
+    unit_of_measurement: "Signal %"
+    entity_category: "diagnostic"
+    device_class: ""
+
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+      entity_category: "diagnostic"
+    ssid:
+      name: "Connected SSID"
+      entity_category: "diagnostic"
+    mac_address:
+      name: "Mac Address"
+      entity_category: "diagnostic"
+
+  #  Creates a sensor showing when the device was last restarted
+  - platform: template
+    name: 'Last Restart'
+    id: device_last_restart
+    icon: mdi:clock
+    entity_category: "diagnostic"
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+  - platform: sntp
+    id: sntp_time
+    # Define the timezone of the device
+    timezone: ""
+    # Change sync interval from default 5min to 6 hours (or as set in substitutions)
+    update_interval: 6h
+    # Set specific sntp servers to use
+    servers:
+      - "0.pool.ntp.org"
+      - "1.pool.ntp.org"
+      - "2.pool.ntp.org"
+    # Publish the time the device was last restarted
+    on_time_sync:
+      then:
+        # Update last restart time, but only once.
+        - if:
+            condition:
+              lambda: 'return id(device_last_restart).state == "";'
+            then:
+              - text_sensor.template.publish:
+                  id: device_last_restart
+                  state: !lambda 'return id(sntp_time).now().strftime("%a %d %b %Y - %I:%M:%S %p");'
+
+output:
+  - platform: ledc
+    pin: 
+      number: 38
+      inverted: false
+    id: backlight_led
+    frequency: 5kHz
+
+light:
+  - platform: monochromatic
+    output: backlight_led
+    name: Backlight
+    id: backlight
+    restore_mode: ALWAYS_ON
+    default_transition_length: 200ms
+
+#-------------------------------------------
+# Graphics and Fonts
+#-------------------------------------------
+font:
+  - file: "gfonts://Roboto"
+    id: roboto16
+    size: 16
+    bpp: 4
+    glyphsets: GF_Latin_Core
+  - file: "gfonts://Roboto"
+    id: roboto24
+    size: 24
+    bpp: 4
+    glyphsets: GF_Latin_Core
+    extras:
+      - file: "fonts/materialdesignicons-webfont.ttf"
+        glyphs:
+          [
+            "\U000F07D1", # home automation
+            "\U000F035E", # menu left
+            "\U000F02DC", # home
+            "\U000F035F", # menu right
+            "\U000F0140", # chevron down
+            "\U000F09D6", # chevron box down
+  ]
+  - file: "gfonts://Roboto"
+    id: roboto32
+    size: 32
+    bpp: 4
+    glyphsets: GF_Latin_Core
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: light40
+    size: 40
+    bpp: 4
+    glyphs: [
+        "\U000F0335", # mdi-lightbulb
+        "\U000F0769", # mdi-ceiling-light
+        "\U000F06B5", # mdi-lamp
+        "\U000F08DD", # mdi-floor-lamp
+        "\U000F12BA", # mdi-string-lights
+        "\U000F040A", # play
+        "\U000F03E4", # pause
+        "\U000F0425", # power
+        "\U000F049D", # shuffle
+        "\U000F0456", # repeat
+        "\U000F075F", # volume mute
+        "\U000F057E", # volume high
+        "\U000F04AE", # skip prev
+        "\U000F04AD", # skip next
+        "\U000F0140", # chevron down
+        "\U000F09D6", # chevron box down
+      ]
+lvgl:
+  displays:
+    - my_display
+
+  log_level: DEBUG
+
+  default_font: roboto24
