@@ -62,7 +62,7 @@ void GC9503V::setup() {
 	config.timings.vsync_pulse_width = this->vsync_pulse_width_;
 	config.timings.vsync_back_porch = this->vsync_back_porch_;
 	config.timings.vsync_front_porch = this->vsync_front_porch_;
-	config.timings.flags.pclk_active_neg = this->pclk_inverted_;
+	//config.timings.flags.pclk_active_neg = this->pclk_inverted_;
 	config.timings.pclk_hz = this->pclk_frequency_;
 	config.clk_src = LCD_CLK_SRC_PLL160M;
 	config.psram_trans_align = 64;
